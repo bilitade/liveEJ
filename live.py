@@ -4,37 +4,34 @@ import os
 import shutil
 import socket
 import time
+from datetime import datetime
 
 def read_config():
-    # Load ATMS.json with error handling
+    """Load configuration from ATMS.json and paths.ini."""
     try:
         with open('atms.json', 'r') as f:
             atms = json.load(f)
-    except FileNotFoundError:
-        print("ATMS.json file not found. Exiting.")
-        exit(1)
-    except json.JSONDecodeError:
-        print("Error decoding ATMS.json. Please check the file format.")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error reading ATMS.json: {e}. Exiting.")
         exit(1)
 
-    # Load paths.ini with error handling
     config = configparser.ConfigParser()
     config.read('paths.ini')
     try:
         source_path = config['DEFAULT']['source']
         destination_path = config['DEFAULT']['destination']
-    except KeyError:
-        print("Error reading paths.ini. Check for 'source' and 'destination' keys.")
+    except KeyError as e:
+        print(f"Error reading paths.ini: missing key {e}. Exiting.")
         exit(1)
     
     return atms, source_path, destination_path
 
 def get_current_ip():
-    # Get the primary external IP address
+    """Get the primary external IP address."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0)
-        s.connect(('8.8.8.8', 80))  # Connect to a public DNS server to detect external IP
+        s.connect(('8.8.8.8', 80))  # Connect to a public DNS server
         ip_address = s.getsockname()[0]
         s.close()
         return ip_address
@@ -42,43 +39,57 @@ def get_current_ip():
         print(f"Error getting IP address: {e}")
         return None
 
+def clear_log_file(file_path):
+    """Clear the content of the log file."""
+    with open(file_path, 'w') as file:
+        file.truncate(0)  # Clear the log file
+    print(f"Cleared the log file: {file_path}")
+
+def log_file_exists(destination_path, terminal_id):
+    """Check if a log file exists for the current date and terminal ID."""
+    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    expected_log_filename = f"{current_date_str}_{terminal_id}.log"
+    expected_log_path = os.path.join(os.path.dirname(destination_path), expected_log_filename)
+    return os.path.exists(expected_log_path), expected_log_path
+
 def monitor_file(source_path, destination_path, terminal_id):
+    """Monitor the source log file for changes and manage log files accordingly."""
     last_size = 0
     last_mod_time = 0
 
     while True:
-        # Check if source file exists
+        # Check if today's log file exists
+        file_exists, new_destination_path = log_file_exists(destination_path, terminal_id)
+
+        # Clear Ejdata.log and create new log file if it doesn't exist
+        if not file_exists:
+            print(f"No log file for today found. Clearing Ejdata.log and creating new file: {new_destination_path}")
+            clear_log_file(source_path)  # Clear the core log file
+
+            os.makedirs(os.path.dirname(new_destination_path), exist_ok=True) #if it doesnt exist create
+
+        # Check if the source file exists
         if not os.path.exists(source_path):
             print(f"Source file does not exist: {source_path}")
-            time.sleep(45)  # Wait before checking again
+            time.sleep(10)  # Check every 10 seconds
             continue
 
         # Get the current size and modification time of the source file
         current_size = os.path.getsize(source_path)
         current_mod_time = os.path.getmtime(source_path)
 
-        # Create new destination filename with terminal_id and date
-        current_date = time.strftime("%Y-%m-%d")  # Get current date
-        new_destination_path = os.path.join(os.path.dirname(destination_path), f"{current_date}_{terminal_id}.log")
-
-        # Create the destination directory if it doesn't exist
-        os.makedirs(os.path.dirname(new_destination_path), exist_ok=True)
-
         # Check if the file size or modification time has changed
         if current_size != last_size or current_mod_time != last_mod_time:
-            # If it has changed, copy the file to the new destination
-            print("Change detected in Ejdata.log, copying file...")
-            shutil.copy2(source_path, new_destination_path)  # Copy the file and preserve metadata
+            print(f"Change detected in Ejdata.log, copying to {new_destination_path}...")
+            shutil.copy2(source_path, new_destination_path)  # Copy the file to the destination
             last_size = current_size
             last_mod_time = current_mod_time
-        
-        # Sleep for 10 seconds to reduce system load and avoid rapid copying
-        time.sleep(10)
+
+        time.sleep(10)  # Wait before checking again
 
 if __name__ == '__main__':
-    # Read configuration
     atms, source_path, destination_path = read_config()
-    
+
     # Get current IP address
     current_ip = get_current_ip()
     print(f"Current IP Address: {current_ip}")
@@ -93,7 +104,6 @@ if __name__ == '__main__':
 
     print("Monitoring for changes in:", source_path)
     try:
-        # Start monitoring the file
         monitor_file(source_path, destination_path, terminal_id)
     except KeyboardInterrupt:
         print("Stopping the monitoring.")
