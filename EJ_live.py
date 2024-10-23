@@ -39,11 +39,21 @@ def get_current_ip():
         print(f"Error getting IP address: {e}")
         return None
 
-def clear_log_file(file_path):
-    """Clear the content of the log file."""
-    with open(file_path, 'w') as file:
-        file.truncate(0)  # Clear the log file
-    print(f"Cleared the log file: {file_path}")
+def move_log_file(source_file,destination_file):
+    """Move the current log file to the EJ_dump folder with a timestamp."""
+    if not os.path.exists(source_file):
+        print(f"Source file does not exist: {source_file}. Skipping move operation.")
+        return  # Skip the move operation if the log file does not exist
+
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    destination_folder = os.path.join(os.path.dirname(destination_file), 'Ejdump')
+    os.makedirs(destination_folder, exist_ok=True)  # Create Ejdump directory if it doesn't exist
+
+    new_file_name = f"EJ_dump_{timestamp}.log"
+    new_file_path = os.path.join(destination_folder, new_file_name)
+
+    shutil.move(source_file, new_file_path)
+    print(f"Moved log file {source_file} to {new_file_path}")
 
 def log_file_exists(destination_path, terminal_id):
     """Check if a log file exists for the current date and terminal ID."""
@@ -61,12 +71,13 @@ def monitor_file(source_path, destination_path, terminal_id):
         # Check if today's log file exists
         file_exists, new_destination_path = log_file_exists(destination_path, terminal_id)
 
-        # Clear Ejdata.log and create new log file if it doesn't exist
+        # Move Ejdata.log to dump folder if the daily log file does not exist
         if not file_exists:
-            print(f"No log file for today found. Clearing Ejdata.log and creating new file: {new_destination_path}")
-            clear_log_file(source_path)  # Clear the core log file
+            print(f"No log file for today found. Moving Ejdata.log to dump folder if it exists.")
+            move_log_file(source_path,destination_path)  # Move the core log file if it exists
 
-            os.makedirs(os.path.dirname(new_destination_path), exist_ok=True) #if it doesnt exist create
+            # Optionally create a new log file here if needed
+            open(source_path, 'w').close()  # Create a new empty Ejdata.log
 
         # Check if the source file exists
         if not os.path.exists(source_path):
