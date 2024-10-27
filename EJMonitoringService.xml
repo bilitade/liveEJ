@@ -1,0 +1,12 @@
+<service>
+  <id>ej_monitoring_service</id>
+  <name>EJ Monitoring Service</name>
+  <description>This service monitors Executable Script which watch and generate 
+  Live Ej(Electronic Journal) from NDC APTRA Main EJDATA.LOG</description>
+  <executable>C:\Users\coop\Desktop\EJpython\dist\EJ_live.exe</executable>
+  <logpath>C:\Users\coop\Desktop\EJpython\dist\ServiceLog</logpath>
+  <log mode="roll">
+    <logfile>stdout.log</logfile>
+    <logfile>stderr.log</logfile>
+  </log>
+</service>

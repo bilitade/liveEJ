@@ -1,5 +1,5 @@
-dist
-build
-CopyEJ
-coreEJ
+dist/
+build/
+CopyEJ/
+coreEJ/
 monitoring.log
