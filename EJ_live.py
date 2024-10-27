@@ -2,44 +2,79 @@ import json
 import configparser
 import os
 import shutil
-import socket
 import time
+import sys  
 from datetime import datetime
+import winreg
 
 def read_config():
     """Load configuration from ATMS.json and paths.ini."""
+    atms = {}
+    source_path, destination_path = None, None
+
+    # Handle ATMS.json
     try:
         with open('atms.json', 'r') as f:
             atms = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error reading ATMS.json: {e}. Exiting.")
-        exit(1)
-
+    except FileNotFoundError:
+        print("ATMS.json not found. Ensure the file exists.")
+    except json.JSONDecodeError:
+        print("ATMS.json is not properly formatted. Please check the JSON structure.")
+    
+    # Handle paths.ini
     config = configparser.ConfigParser()
-    config.read('paths.ini')
     try:
-        source_path = config['DEFAULT']['source']
-        destination_path = config['DEFAULT']['destination']
+        if not config.read('paths.ini'):
+            print("paths.ini not found or empty.")
+        else:
+            source_path = config['DEFAULT'].get('source', None)
+            destination_path = config['DEFAULT'].get('destination', None)
+            
+            if source_path is None or destination_path is None:
+                print("Source or destination path is missing in paths.ini.")
     except KeyError as e:
-        print(f"Error reading paths.ini: missing key {e}. Exiting.")
-        exit(1)
+        print(f"Missing key in paths.ini: {e}")
     
     return atms, source_path, destination_path
 
-def get_current_ip():
-    """Get the primary external IP address."""
+
+def get_manual_ipv4():
+    """
+    Get the manually configured IPv4 address from the Windows Registry.
+    """
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(('8.8.8.8', 80))  # Connect to a public DNS server
-        ip_address = s.getsockname()[0]
-        s.close()
-        return ip_address
+        # Open the registry key where network adapter information is stored
+        reg_key_path = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces"
+        reg_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_key_path)
+
+        # Iterate through all subkeys (network adapters)
+        i = 0
+        while True:
+            try:
+                adapter_key_name = winreg.EnumKey(reg_key, i)
+                adapter_key_path = reg_key_path + "\\" + adapter_key_name
+                adapter_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, adapter_key_path)
+
+                # Check for a manually configured IP address
+                try:
+                    ip_address, _ = winreg.QueryValueEx(adapter_key, "IPAddress")
+                    if ip_address and ip_address[0] != "0.0.0.0":
+                        return ip_address[0]
+                except FileNotFoundError:
+                    pass  # IPAddress not found for this adapter, continue to the next
+
+                i += 1
+            except OSError:
+                # No more subkeys
+                break
+
+        return None
     except Exception as e:
-        print(f"Error getting IP address: {e}")
+        print(f"Error: {e}")
         return None
 
-def move_log_file(source_file,destination_file):
+
+def move_log_file(source_file, destination_file):
     """Move the current log file to the EJ_dump folder with a timestamp."""
     if not os.path.exists(source_file):
         print(f"Source file does not exist: {source_file}. Skipping move operation.")
@@ -55,12 +90,18 @@ def move_log_file(source_file,destination_file):
     shutil.move(source_file, new_file_path)
     print(f"Moved log file {source_file} to {new_file_path}")
 
+
+
+
+
 def log_file_exists(destination_path, terminal_id):
     """Check if a log file exists for the current date and terminal ID."""
-    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    current_date_str = datetime.now().strftime("%Y_%m_%d")
     expected_log_filename = f"{current_date_str}_{terminal_id}.log"
     expected_log_path = os.path.join(os.path.dirname(destination_path), expected_log_filename)
     return os.path.exists(expected_log_path), expected_log_path
+
+
 
 def monitor_file(source_path, destination_path, terminal_id):
     """Monitor the source log file for changes and manage log files accordingly."""
@@ -71,13 +112,13 @@ def monitor_file(source_path, destination_path, terminal_id):
         # Check if today's log file exists
         file_exists, new_destination_path = log_file_exists(destination_path, terminal_id)
 
-        # Move Ejdata.log to dump folder if the daily log file does not exist
+        # Move EJDATA.LOG to dump folder if the daily log file does not exist
         if not file_exists:
-            print(f"No log file for today found. Moving Ejdata.log to dump folder if it exists.")
-            move_log_file(source_path,destination_path)  # Move the core log file if it exists
+            print(f"No log file for today found. Moving EJDATA.LOG to dump folder if it exists.")
+            move_log_file(source_path, destination_path)  # Move the core log file if it exists
 
             # Optionally create a new log file here if needed
-            open(source_path, 'w').close()  # Create a new empty Ejdata.log
+            open(source_path, 'w').close()  # Create a new empty EJDATA.LOG
 
         # Check if the source file exists
         if not os.path.exists(source_path):
@@ -91,30 +132,45 @@ def monitor_file(source_path, destination_path, terminal_id):
 
         # Check if the file size or modification time has changed
         if current_size != last_size or current_mod_time != last_mod_time:
-            print(f"Change detected in Ejdata.log, copying to {new_destination_path}...")
+            print(f"Change detected in EJDATA.LOG, copying to {new_destination_path}...")
             shutil.copy2(source_path, new_destination_path)  # Copy the file to the destination
             last_size = current_size
             last_mod_time = current_mod_time
 
-        time.sleep(10)  # Wait before checking again
+        time.sleep(5)  # Wait before checking again
+
+
+
+
 
 if __name__ == '__main__':
     atms, source_path, destination_path = read_config()
 
-    # Get current IP address
-    current_ip = get_current_ip()
-    print(f"Current IP Address: {current_ip}")
-
-    # Retrieve terminal_id based on the current IP address
-    terminal_id = atms.get(current_ip)
-    if terminal_id:
-        print(f"Terminal ID for IP {current_ip}: {terminal_id}")
+    # Ensure required data is loaded before proceeding
+    if not atms:
+        print("No ATMs data loaded. Exiting gracefully.")
+        sys.exit(1)
+    elif not source_path or not destination_path:
+        print("Paths not correctly loaded. Exiting gracefully.")
+        sys.exit(1)
     else:
-        print(f"No terminal ID found for IP {current_ip}. Exiting.")
-        exit(1)  # Exit if no terminal ID is found
+        # Get current IP address
+        current_ip = get_manual_ipv4()
+        if current_ip:
+            print(f"Current IP Address: {current_ip}")
 
-    print("Monitoring for changes in:", source_path)
-    try:
-        monitor_file(source_path, destination_path, terminal_id)
-    except KeyboardInterrupt:
-        print("Stopping the monitoring.")
+            # Retrieve terminal_id based on the current IP address
+            terminal_id = atms.get(current_ip)
+            if terminal_id:
+                print(f"Terminal ID for IP {current_ip}: {terminal_id}")
+                print("Monitoring for changes in:", source_path)
+                try:
+                    monitor_file(source_path, destination_path, terminal_id)
+                except KeyboardInterrupt:
+                    print("Stopping the monitoring.")
+            else:
+                print(f"No terminal ID found for IP {current_ip}. Make sure the current IP exists and is mapped to a Terminal ID in atms.json. Exiting gracefully.")
+                sys.exit(1)
+        else:
+            print("Unable to retrieve the current IP address. Exiting gracefully.")
+            sys.exit(1)
