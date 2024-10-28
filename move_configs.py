@@ -7,7 +7,8 @@ source_files = [
     'EJMonitoringService.xml',
     'paths.ini',
     'ip_terminal_id.csv',
-    'service_options.bat'
+    'service_options.bat',
+    'write_simulator.py'
 ]
 
 # Path to the distribution directory (update this if necessary)

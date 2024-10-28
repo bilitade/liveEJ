@@ -13,7 +13,7 @@ def write_to_log(log_path, duration=180):
     entry = 1
     
     # List of possible intervals in seconds
-    intervals = [0.5, 1, 3, 5]  # You can add more intervals as needed
+    intervals = [0.5,0.7,1,2,3,]  # You can add more intervals as needed
     
     while time.time() - start_time < duration:
         with open(log_path, 'a') as log_file:

@@ -28,6 +28,8 @@ def setup_logging(log_file="monitoring_status.log"):
     return logger
 
 
+
+
 def read_config():
     """Load configuration from paths.ini and retrieve paths for files and folders."""
     config = configparser.ConfigParser()
@@ -81,11 +83,16 @@ def load_terminal_ids(csv_path):
     return terminal_ids
 
 
-
-def get_manual_ipv4():
+def get_priority_manual_ipv4():
     """
-    Get the manually configured IPv4 address from the Windows Registry.
+    Get the highest priority manually configured IPv4 address from the Windows Registry.
+    Priority order:
+    1. IP addresses starting with "192.168..."
+    2. IP addresses starting with "10.1..."
+    3. Return "0.0.0.0" if neither are found.
     """
+    ip_addresses = []
+    
     try:
         # Open the registry key where network adapter information is stored
         reg_key_path = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces"
@@ -103,7 +110,7 @@ def get_manual_ipv4():
                 try:
                     ip_address, _ = winreg.QueryValueEx(adapter_key, "IPAddress")
                     if ip_address and ip_address[0] != "0.0.0.0":
-                        return ip_address[0]
+                        ip_addresses.append(ip_address[0])  # Collect all valid IPs
                 except FileNotFoundError:
                     pass  # IPAddress not found for this adapter, continue to the next
 
@@ -112,10 +119,21 @@ def get_manual_ipv4():
                 # No more subkeys
                 break
 
-        return None
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+        # Sort based on priority: "192.168..." > "10.1..."
+        for ip in ip_addresses:
+            if ip.startswith("192.168"):
+                return ip
+        for ip in ip_addresses:
+            if ip.startswith("10.1"):
+                return ip
+
+        return "0.0.0.0"  # Return default if no priority IP is found
+
+    except Exception:
+        return "0.0.0.0"
+
+
+
 
 
 
@@ -154,6 +172,7 @@ def monitor_file(source_path, destination_path, terminal_id):
     last_date = last_run_date()  # Load last date from file
     new_destination_path = os.path.join(destination_path, f"{last_date}_{terminal_id}.log")
 
+
     while True:
         current_date = datetime.now().strftime("%Y_%m_%d")
 
@@ -166,21 +185,21 @@ def monitor_file(source_path, destination_path, terminal_id):
         # Detect date change due to downtime or daily rollover
         if current_date != last_date:
             # Dump the previous EJDATA.LOG to handle date change
-            logger.info(f"Date change detected: {last_date} to {current_date}. Dumping EJDATA.LOG.")
+            logger.info(f"'DATE CHANGE' Detected: {last_date} to {current_date}. Deleting Old EJDATA.LOG...")
             delete_EJ(source_path)
         
             open(source_path, 'w').close()  # Clear EJDATA.LOG for fresh content
-
+            
             # Update last date and destination path
             last_date = current_date
             save_last_run_date(last_date)  # Persist the updated last date
             new_destination_path = os.path.join(destination_path, f"{current_date}_{terminal_id}.log")
-            logger.info(f"New Daily EJ File Created {new_destination_path}.")
+            logger.info(f"-New DAILY EJ -Created @ -{new_destination_path}.")
 
         # Check if file size or modification time has changed
         current_size, current_mod_time = os.path.getsize(source_path), os.path.getmtime(source_path)
         if current_size != last_size or current_mod_time != last_mod_time:
-            logger.info(f"Change detected in EJDATA.LOG, copying to {new_destination_path}.")
+            logger.info(f"Change detected in EJDATA.LOG, Copying To Destination...")
             shutil.copy2(source_path, new_destination_path)
 
             # Update last known file size and modification time
@@ -200,13 +219,14 @@ def main():
     else:
         logger.info("Config Loaded Successfully")
 
-    static_ip = get_manual_ipv4()
+    static_ip = get_priority_manual_ipv4()
     if static_ip:
         logger.info(f"The Static IP Address: {static_ip}")
         terminal_id = atms.get(static_ip)
         if terminal_id:
             logger.info(f"Terminal ID for IP {static_ip}: {terminal_id}")
-            logger.info(f"Monitoring for changes in: {source_path}")
+            logger.info(f"Watching for changes in: {source_path}")
+          
             
             monitor_file(source_path, destination_path, terminal_id)
             
@@ -223,7 +243,7 @@ if __name__ == '__main__':
     
      # Set up logging
     logger = setup_logging() 
-    logger.info("script initiated...")
+    logger.info("The Script Started...")
     try:
         main()
     except KeyboardInterrupt:

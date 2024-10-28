@@ -2,6 +2,6 @@ dist/
 build/
 CopyEJ/
 coreEJ/
-monitoring.log
+monitoring_status.log
 last_run_date.txt
 
