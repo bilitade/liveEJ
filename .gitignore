@@ -3,3 +3,5 @@ build/
 CopyEJ/
 coreEJ/
 monitoring.log
+last_run_date.txt
+

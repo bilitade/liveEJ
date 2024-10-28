@@ -1,10 +1,10 @@
 <service>
-  <id>ej_monitoring_service</id>
+    <id>EJMonitoringService</id>
   <name>EJ Monitoring Service</name>
   <description>This service monitors Executable Script which watch and generate 
   Live Ej(Electronic Journal) from NDC APTRA Main EJDATA.LOG</description>
-  <executable>C:\Users\coop\Desktop\EJpython\dist\EJ_live.exe</executable>
-  <logpath>C:\Users\coop\Desktop\EJpython\dist\ServiceLog</logpath>
+  <executable>ej_live.exe</executable>  <!-- Executable in the current directory -->
+  <logpath>ServiceLog</logpath>  <!-- Log directory in the current directory -->
   <log mode="roll">
     <logfile>stdout.log</logfile>
     <logfile>stderr.log</logfile>
