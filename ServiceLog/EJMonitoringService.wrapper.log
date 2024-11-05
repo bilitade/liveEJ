@@ -1,0 +1,14 @@
+2024-10-31 10:46:16,589 DEBUG - Starting WinSW in console mode
+2024-10-31 10:46:23,440 DEBUG - Starting WinSW in console mode
+2024-10-31 10:46:27,351 DEBUG - Starting WinSW in console mode
+2024-10-31 10:46:27,410 INFO  - Uninstalling service 'EJ Monitoring Service (EJMonitoringService)'...
+2024-10-31 10:46:27,423 INFO  - Service 'EJ Monitoring Service (EJMonitoringService)' was uninstalled successfully.
+2024-10-31 10:46:34,510 DEBUG - Starting WinSW in console mode
+2024-10-31 11:12:40,943 DEBUG - Starting WinSW in console mode
+2024-10-31 11:12:44,469 DEBUG - Starting WinSW in console mode
+2024-10-31 11:12:44,537 INFO  - Stopping service 'EJ Monitoring Service (EJMonitoringService)'...
+2024-10-31 11:12:44,554 INFO  - Service 'EJ Monitoring Service (EJMonitoringService)' stopped successfully.
+2024-10-31 11:12:48,836 DEBUG - Starting WinSW in console mode
+2024-10-31 11:12:51,453 DEBUG - Starting WinSW in console mode
+2024-10-31 11:12:51,514 INFO  - Uninstalling service 'EJ Monitoring Service (EJMonitoringService)'...
+2024-10-31 11:12:51,529 WARN  - Service 'EJ Monitoring Service (EJMonitoringService)' does not exist.

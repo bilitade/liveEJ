@@ -42,14 +42,13 @@ def read_config():
     source_path = config['DEFAULT'].get('source')
     destination_path = config['DEFAULT'].get('destination')
     terminal_csv = config['DEFAULT'].get('csv_path') 
-    ejdump_folder = config['DEFAULT'].get('ej_dump_folder')  
+    
 
     if not source_path or not destination_path:
         logger.warning("Source or destination path is missing in paths.ini.")
     if not terminal_csv:
         logger.warning("Terminal CSV path is missing in paths.ini.")
-    if not ejdump_folder:
-        logger.warning("EJdump folder path is missing in paths.ini.")
+    
     
     # Load the terminal IDs from the CSV file
     if terminal_csv: 
@@ -58,7 +57,7 @@ def read_config():
         except FileNotFoundError:
             logger.error(f"Terminal CSV file not found at {terminal_csv}.")
     
-    return atms, source_path, destination_path, ejdump_folder
+    return atms, source_path, destination_path
 
 
 def load_terminal_ids(csv_path):
@@ -138,10 +137,10 @@ def get_priority_manual_ipv4():
 
 
 
-def delete_EJ(source_file):
-    """Delete the current log file."""
+def clear_EJ(source_file):
+    """Clear the current log file."""
     if not os.path.exists(source_file):
-        logger.warning(f"Source file does not exist: {source_file}. Skipping delete operation.")
+        logger.warning(f"Source file does not exist: {source_file}. Skipping Clear operation.")
         return
 
     try:
@@ -186,7 +185,7 @@ def monitor_file(source_path, destination_path, terminal_id):
         if current_date != last_date:
             # Dump the previous EJDATA.LOG to handle date change
             logger.info(f"'DATE CHANGE' Detected: {last_date} to {current_date}. Deleting Old EJDATA.LOG...")
-            delete_EJ(source_path)
+            clear_EJ(source_path)
         
             open(source_path, 'w').close()  # Clear EJDATA.LOG for fresh content
             
@@ -194,12 +193,15 @@ def monitor_file(source_path, destination_path, terminal_id):
             last_date = current_date
             save_last_run_date(last_date)  # Persist the updated last date
             new_destination_path = os.path.join(destination_path, f"{current_date}_{terminal_id}.log")
-            logger.info(f"-New DAILY EJ -Created @ -{new_destination_path}.")
+            logger.info(f"Creating New DAILY EJ- @ -{new_destination_path}.")
+           
 
         # Check if file size or modification time has changed
         current_size, current_mod_time = os.path.getsize(source_path), os.path.getmtime(source_path)
         if current_size != last_size or current_mod_time != last_mod_time:
             logger.info(f"Change detected in EJDATA.LOG, Copying To Destination...")
+            if not os.path.exists(destination_path):
+                os.makedirs(destination_path)
             shutil.copy2(source_path, new_destination_path)
 
             # Update last known file size and modification time
@@ -211,9 +213,9 @@ def monitor_file(source_path, destination_path, terminal_id):
 
 def main():
 
-    atms, source_path, destination_path, ejdump_folder = read_config()
+    atms, source_path, destination_path = read_config()
 
-    if not all([atms, source_path, destination_path, ejdump_folder]):
+    if not all([atms, source_path, destination_path]):
         logger.error("Configuration incomplete. Exiting gracefully.")
         sys.exit(1)
     else:
