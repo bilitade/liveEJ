@@ -8,16 +8,32 @@ from datetime import datetime
 import winreg
 import csv
 
-def setup_logging(log_file="monitoring_status.log"):
-    """Set up logging configuration."""
+from logging.handlers import RotatingFileHandler
+
+def setup_logging(log_file="./ej_live_status/monitoring_status.log", max_log_size=5*1024*1024, backup_count=3):
+    """Set up logging configuration with log rotation and ensure the directory exists."""
+    
+    # Check if the directory exists, if not, create it
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        try:
+            os.makedirs(log_dir)
+            print(f"Created log directory: {log_dir}")
+        except Exception as e:
+            print(f"Error creating log directory: {e}")
+            return None
+
+    # Create or get the logger
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
-    # File handler to write logs to a file
-    file_handler = logging.FileHandler(log_file)
+    # Create a rotating file handler
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=max_log_size, backupCount=backup_count
+    )
     file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
-    # Console handler to display logs on the terminal
+    # Console handler to display logs in the terminal
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
@@ -28,8 +44,46 @@ def setup_logging(log_file="monitoring_status.log"):
     return logger
 
 
+def rename_files():
+    directory_path = r"C:\NCR"
 
+    """
+    Renames all `.bat`, `.vbs`, and `.exe` files in the given directory by prefixing them with `dont_rename_`.
+    If the file already has the prefix, it skips renaming it.
+    If a file with the new name exists, it will be overridden.
+    """
+    # Validate the path
+    if not os.path.exists(directory_path):
+        logger.warning(f"Invalid or non-existent path to find nx-daily.bat at: '{directory_path}'")
+        return
 
+    # Rename `.bat`, `.vbs`, and `.exe` files in the specified directory
+    logger.info(f"Check For nx-daily in NCR  {directory_path}")
+    for file_name in os.listdir(directory_path):
+        # Process only `.bat`, `.vbs`, and `.exe` files
+        if file_name.endswith(('.bat', '.vbs', '.exe')):  
+            old_path = os.path.join(directory_path, file_name)
+
+            # Check if 'dont_rename_' is already in the file name
+            if "dont_rename_" in file_name:
+                logger.info(f"Skipping: {old_path} (already contains 'dont_rename_' prefix)")
+                continue
+
+            new_name = f"dont_rename_{file_name}"  # Add prefix to file name
+            new_path = os.path.join(directory_path, new_name)
+
+            try:
+                # Check if file with new name exists, and remove it if so
+                if os.path.exists(new_path):
+                    os.remove(new_path)
+                    logger.info(f"Removed existing file: {new_path}")
+
+                # Rename the file (now it's safe to rename since we've ensured no conflict)
+                os.rename(old_path, new_path)
+                logger.info(f"Renamed: {old_path} -> {new_path}")
+            except Exception as e:
+                logger.error(f"Failed to rename {old_path}: {e}")
+                
 def read_config():
     """Load configuration from paths.ini and retrieve paths for files and folders."""
     config = configparser.ConfigParser()
@@ -42,6 +96,7 @@ def read_config():
     source_path = config['DEFAULT'].get('source')
     destination_path = config['DEFAULT'].get('destination')
     terminal_csv = config['DEFAULT'].get('csv_path') 
+  
     
 
     if not source_path or not destination_path:
@@ -167,10 +222,11 @@ def save_last_run_date(date_str):
 
 def monitor_file(source_path, destination_path, terminal_id):
     """Monitor EJDATA.LOG and handle date-based log rotation with downtime handling."""
+    
     last_size, last_mod_time = 0, 0
     last_date = last_run_date()  # Load last date from file
     new_destination_path = os.path.join(destination_path, f"{last_date}_{terminal_id}.log")
-
+    rename_files()
 
     while True:
         current_date = datetime.now().strftime("%Y_%m_%d")

@@ -1,0 +1,33 @@
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        filevers=(1, 0, 0, 0),  # File version
+        prodvers=(1, 0, 0, 0),  # Product version
+        mask=0x3f,
+        flags=0x0,
+        OS=0x4,
+        fileType=0x1,  # Application
+        subtype=0x0,
+        date=(0, 0)
+    ),
+    kids=[
+        StringFileInfo(
+            [
+                StringTable(
+                    u'040904B0',  # Language and code page
+                    [
+                        StringStruct(u'CompanyName', u'Cooperative Bank of Oromia'),
+                        StringStruct(u'FileDescription', u'ej_live Application for data processing'),
+                        StringStruct(u'FileVersion', u'1.0.0.0'),
+                        StringStruct(u'InternalName', u'ej_live'),
+                        StringStruct(u'LegalCopyright', u'© 2024 Cooperative Bank of Oromia. All rights reserved.'),
+                        StringStruct(u'OriginalFilename', u'ej_live.exe'),
+                        StringStruct(u'ProductName', u'ej_live Data Processing App'),
+                        StringStruct(u'ProductVersion', u'1.0.0.0'),
+                        StringStruct(u'LegalTrademarks', u'Developer: Bilisuma Tadesse')
+                    ]
+                )
+            ]
+        ),
+        VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+    ]
+)

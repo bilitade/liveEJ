@@ -4,4 +4,5 @@ CopyEJ/
 coreEJ/
 monitoring_status.log
 last_run_date.txt
+ip_terminal_id.csv
 
