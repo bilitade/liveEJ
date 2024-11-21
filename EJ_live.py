@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 import winreg
 import csv
+import threading
 
 from logging.handlers import RotatingFileHandler
 
@@ -46,43 +47,34 @@ def setup_logging(log_file="./ej_live_status/monitoring_status.log", max_log_siz
 
 def rename_files():
     directory_path = r"C:\NCR"
-
-    """
-    Renames all `.bat`, `.vbs`, and `.exe` files in the given directory by prefixing them with `dont_rename_`.
-    If the file already has the prefix, it skips renaming it.
-    If a file with the new name exists, it will be overridden.
-    """
+    
     # Validate the path
     if not os.path.exists(directory_path):
-        logger.warning(f"Invalid or non-existent path to find nx-daily.bat at: '{directory_path}'")
+        logger.warning(f"Invalid or non-existent path: '{directory_path}'")
         return
 
-    # Rename `.bat`, `.vbs`, and `.exe` files in the specified directory
-    logger.info(f"Check For nx-daily in NCR  {directory_path}")
+    # Iterate through files in the directory
     for file_name in os.listdir(directory_path):
         # Process only `.bat`, `.vbs`, and `.exe` files
         if file_name.endswith(('.bat', '.vbs', '.exe')):  
             old_path = os.path.join(directory_path, file_name)
 
-            # Check if 'dont_rename_' is already in the file name
+            # Skip files that already have the 'dont_rename_' prefix
             if "dont_rename_" in file_name:
-                logger.info(f"Skipping: {old_path} (already contains 'dont_rename_' prefix)")
-                continue
+                continue  # No log for files that are already renamed
 
-            new_name = f"dont_rename_{file_name}"  # Add prefix to file name
+            new_name = f"dont_rename_{file_name}"  # Add prefix to the file name
             new_path = os.path.join(directory_path, new_name)
 
             try:
-                # Check if file with new name exists, and remove it if so
-                if os.path.exists(new_path):
-                    os.remove(new_path)
-                    logger.info(f"Removed existing file: {new_path}")
-
-                # Rename the file (now it's safe to rename since we've ensured no conflict)
-                os.rename(old_path, new_path)
-                logger.info(f"Renamed: {old_path} -> {new_path}")
+                # Rename the file if no conflict exists
+                if not os.path.exists(new_path):
+                    os.rename(old_path, new_path)
+                    logger.info(f"New file detected and renamed: {old_path} -> {new_path}")  # Log only when renamed
             except Exception as e:
                 logger.error(f"Failed to rename {old_path}: {e}")
+
+
                 
 def read_config():
     """Load configuration from paths.ini and retrieve paths for files and folders."""
@@ -226,7 +218,8 @@ def monitor_file(source_path, destination_path, terminal_id):
     last_size, last_mod_time = 0, 0
     last_date = last_run_date()  # Load last date from file
     new_destination_path = os.path.join(destination_path, f"{last_date}_{terminal_id}.log")
-    rename_files()
+ 
+
 
     while True:
         current_date = datetime.now().strftime("%Y_%m_%d")
@@ -266,33 +259,45 @@ def monitor_file(source_path, destination_path, terminal_id):
         time.sleep(1)
 
 
+def rename_task_scheduler(interval=300):
+    """
+    Run `rename_files` every `interval` seconds in a separate thread.
+    """
+    while True:
+        rename_files()
+        time.sleep(interval)
 
 def main():
+    # Start the rename task in a separate thread
+    rename_thread = threading.Thread(target=rename_task_scheduler, args=(300,), daemon=True)
+    rename_thread.start()
 
-    atms, source_path, destination_path = read_config()
+    try:
+        atms, source_path, destination_path = read_config()
 
-    if not all([atms, source_path, destination_path]):
-        logger.error("Configuration incomplete. Exiting gracefully.")
-        sys.exit(1)
-    else:
-        logger.info("Config Loaded Successfully")
-
-    static_ip = get_priority_manual_ipv4()
-    if static_ip:
-        logger.info(f"The Static IP Address: {static_ip}")
-        terminal_id = atms.get(static_ip)
-        if terminal_id:
-            logger.info(f"Terminal ID for IP {static_ip}: {terminal_id}")
-            logger.info(f"Watching for changes in: {source_path}")
-          
-            
-            monitor_file(source_path, destination_path, terminal_id)
-            
-        else:
-            logger.warning(f"No terminal ID found for IP {static_ip}. Check 'ip_terminal_id.csv',  Exiting...")
+        if not all([atms, source_path, destination_path]):
+            logger.error("Configuration incomplete. Exiting gracefully.")
             sys.exit(1)
-    else:
-        logger.error("Unable to retrieve the current IP address. Exiting gracefully.")
+        else:
+            logger.info("Config Loaded Successfully")
+
+        static_ip = get_priority_manual_ipv4()
+        if static_ip:
+            logger.info(f"The Static IP Address: {static_ip}")
+            terminal_id = atms.get(static_ip)
+            if terminal_id:
+                logger.info(f"Terminal ID for IP {static_ip}: {terminal_id}")
+                logger.info(f"Watching for changes in: {source_path}")
+                
+                monitor_file(source_path, destination_path, terminal_id)
+            else:
+                logger.warning(f"No terminal ID found for IP {static_ip}. Check 'ip_terminal_id.csv', Exiting...")
+                sys.exit(1)
+        else:
+            logger.error("Unable to retrieve the current IP address. Exiting gracefully.")
+            sys.exit(1)
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
         sys.exit(1)
 
 
